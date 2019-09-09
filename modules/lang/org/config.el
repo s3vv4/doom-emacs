@@ -611,9 +611,6 @@ between the two."
       :after org-agenda
       :config (evil-org-agenda-set-keys))
 
-    ;; Only fold the current tree, rather than recursively
-    (add-hook 'org-tab-first-hook #'+org-cycle-only-current-subtree-h t)
-
     ;; Fix o/O creating new list items in the middle of nested plain lists. Only
     ;; has an effect when `evil-org-special-o/O' has `item' in it (not the
     ;; default).
