@@ -25,7 +25,8 @@
 
   (map! :map go-mode-map
         :localleader
-        "a" #'go-add-tags
+        "a" #'go-tag-add
+        "d" #'go-tag-remove
         "e" #'+go/play-buffer-or-region
         "i" #'go-goto-imports      ; Go to imports
         (:prefix ("h" . "help")
@@ -51,7 +52,10 @@
           "t" #'+go/test-rerun
           "a" #'+go/test-all
           "s" #'+go/test-single
-          "n" #'+go/test-nested)))
+          "n" #'+go/test-nested
+          "g" #'go-gen-test-dwim
+          "G" #'go-gen-test-all
+          "e" #'go-gen-test-exported)))
 
 
 (use-package! gorepl-mode

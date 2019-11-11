@@ -1,18 +1,7 @@
 ;;; lang/web/+html.el -*- lexical-binding: t; -*-
 
 (use-package! web-mode
-  :mode "\\.p?html?\\'"
-  :mode "\\.\\(?:tpl\\|blade\\)\\(?:\\.php\\)?\\'"
-  :mode "\\.erb\\'"
-  :mode "\\.jsp\\'"
-  :mode "\\.as[cp]x\\'"
-  :mode "\\.hbs\\'"
-  :mode "\\.mustache\\'"
-  :mode "\\.svelte\\'"
-  :mode "\\.tsx\\'"
-  :mode "\\.vue\\'"
-  :mode "\\.twig\\'"
-  :mode "\\.jinja\\'"
+  :mode "\\.\\(?:as\\(?:[cp]x\\)\\|blade\\.php\\|erb\\|hbs\\|j\\(?:inja\\|sp\\)\\|mustache\\|p?html?\\|svelte\\|t\\(?:pl\\.php\\|sx\\|wig\\)\\|vue\\)\\'"
   :mode "wp-content/themes/.+/.+\\.php\\'"
   :mode "templates/.+\\.php\\'"
   :config
@@ -52,12 +41,7 @@
       (setcdr alist
               (cl-loop for pair in (cdr alist)
                        unless (string-match-p "^[a-z-]" (cdr pair))
-                       collect (cons (car pair)
-                                     ;; TODO Replace with `string-trim-right' (Emacs 26+)
-                                     (let ((string (cdr pair)))
-                                       (if (string-match "\\(?:>\\|]\\|}\\)+\\'" string)
-                                           (replace-match "" t t string)
-                                         string))))))
+                       collect (cons (car pair) (string-trim-right (cdr pair))))))
     (delq! nil web-mode-engines-auto-pairs))
 
   (map! :map web-mode-map
@@ -132,7 +116,7 @@
 (after! pug-mode
   (set-company-backend! 'pug-mode 'company-web-jade))
 (after! web-mode
-  (set-company-backend! 'web-mode 'company-web-html))
+  (set-company-backend! 'web-mode 'company-css 'company-web-html))
 (after! slim-mode
   (set-company-backend! 'slim-mode 'company-web-slim))
 

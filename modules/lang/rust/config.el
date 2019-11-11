@@ -1,87 +1,56 @@
 ;;; lang/rust/config.el -*- lexical-binding: t; -*-
 
-(use-package! rust-mode
-  :defer t
+(after! projectile
+  (add-to-list 'projectile-project-root-files "Cargo.toml"))
+
+
+;;
+;;; Packages
+
+(use-package! rustic
+  :mode ("\\.rs$" . rustic-mode)
+  :preface
+  (setq rustic-rls-pkg (if (featurep! +lsp) 'lsp-mode))
   :config
-  (setq rust-indent-method-chain t)
-  (add-hook 'rust-mode-hook #'rainbow-delimiters-mode)
+  (set-docsets! 'rustic-mode "Rust")
 
-  ;; This is necessary because both plugins are fighting for supremacy in
-  ;; `auto-mode-alist', so rustic-mode *must* load second. It only needs to
-  ;; happen once.
-  ;;
-  ;; rust-mode is still required for `racer'.
-  (add-hook! 'rust-mode-hook
-    (defun +rust-init-h ()
-      "Switch to `rustic-mode', if it's available."
-      (when (require 'rustic nil t)
-        (rustic-mode))))
+  (setq rustic-indent-method-chain t
+        rustic-flycheck-setup-mode-line-p nil
+        ;; use :editor format instead
+        rustic-format-on-save nil
+        ;; REVIEW `rust-ordinary-lt-gt-p' is terribly expensive in large rust
+        ;;        buffers, so we disable it, but only for evil users, because it
+        ;;        affects `forward-sexp' and its ilk. See
+        ;;        https://github.com/rust-lang/rust-mode/issues/288.
+        rustic-match-angle-brackets (not (featurep! :editor evil))
+        ;; `rustic-setup-rls' uses `package-installed-p' to determine if
+        ;; lsp-mode/elgot are available. This breaks because Doom doesn't use
+        ;; package.el to begin with (and lazy loads it). This is already handled
+        ;; by the :tools lsp module, so...
+        rustic-lsp-setup-p nil)
 
-  (set-docsets! '(rust-mode rustic-mode) "Rust")
+  (add-hook 'rustic-mode-hook #'rainbow-delimiters-mode)
+
   (when (featurep! +lsp)
-    (add-hook 'rust-mode-local-vars-hook #'lsp!))
-
-  ;; TODO PR these upstream
-  (after! dtrt-indent
-    (pushnew! dtrt-indent-hook-mapping-list
-              '(rust-mode default rust-indent-offset)
-              '(rustic-mode default rustic-indent-offset)))
-  (when (featurep! :tools editorconfig)
-    (after! editorconfig
-      (pushnew! editorconfig-indentation-alist
-                '(rustic-mode rustic-indent-offset)))))
+    (add-hook 'rustic-mode-local-vars-hook #'lsp!)))
 
 
 (use-package! racer
   :unless (featurep! +lsp)
-  :hook ((rust-mode rustic-mode) . racer-mode)
+  :hook (rustic-mode . racer-mode)
   :config
-  (set-lookup-handlers! 'rust-mode
+  (set-lookup-handlers! 'rustic-mode
     :definition '(racer-find-definition :async t)
     :documentation '+rust-racer-lookup-documentation))
-
-
-(use-package! rustic
-  :when EMACS26+
-  :after rust-mode
-  :preface
-  (setq rustic-rls-pkg (if (featurep! +lsp) 'lsp-mode))
-  :config
-  (setq rustic-indent-method-chain t
-        rustic-flycheck-setup-mode-line-p nil
-        ;; use :editor format instead
-        rustic-format-on-save nil)
-
-  (add-hook 'rustic-mode-hook #'rainbow-delimiters-mode)
-
-  (defadvice! +rust--dont-install-packages-p (orig-fn &rest args)
-    :around #'rustic-setup-rls
-    (cl-letf (;; `rustic-setup-rls' uses `package-installed-p' to determine if
-              ;; lsp-mode/elgot are available. This breaks because Doom doesn't
-              ;; use package.el to begin with (and lazy loads it).
-              ((symbol-function #'package-installed-p)
-               (lambda (pkg)
-                 (require pkg nil t)))
-              ;; If lsp/elgot isn't available, it attempts to install lsp-mode
-              ;; via package.el. Doom manages its own dependencies so we disable
-              ;; that behavior.
-              ((symbol-function #'rustic-install-rls-client-p)
-               (lambda (&rest _)
-                 (message "No RLS server running."))))
-      (apply orig-fn args))))
 
 
 ;;
 ;;; Tools
 
 (use-package! cargo
-  :after rust-mode
+  :after rustic-mode
   :config
-  (defvar +rust-keymap
-    (if (boundp 'rustic-mode-map)
-        rustic-mode-map
-      rust-mode-map))
-  (map! :map +rust-keymap
+  (map! :map rustic-mode-map
         :localleader
         (:prefix ("b" . "build")
           :desc "cargo add"    "a" #'cargo-process-add

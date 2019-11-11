@@ -1,5 +1,12 @@
 ;;; lang/clojure/config.el -*- lexical-binding: t; -*-
 
+(after! projectile
+  (pushnew! projectile-project-root-files "project.clj" "build.boot" "deps.edn"))
+
+
+;;
+;;; Packages
+
 ;;;###package clojure-mode
 (add-hook 'clojure-mode-hook #'rainbow-delimiters-mode)
 
@@ -10,8 +17,8 @@
   :hook (clojure-mode-local-vars . cider-mode)
   :init
   (after! clojure-mode
-    (set-repl-handler! 'clojure-mode #'+clojure/open-repl)
-    (set-repl-handler! 'clojurescript-mode #'+clojure/open-cljs-repl)
+    (set-repl-handler! 'clojure-mode #'+clojure/open-repl :persist t)
+    (set-repl-handler! 'clojurescript-mode #'+clojure/open-cljs-repl :persist t)
     (set-eval-handler! '(clojure-mode clojurescript-mode) #'cider-eval-region))
   :config
   (add-hook 'cider-mode-hook #'eldoc-mode)
@@ -50,11 +57,12 @@
   (add-hook! 'cider-connected-hook
     (defun +clojure--cider-dump-nrepl-server-log-h ()
       "Copy contents of *nrepl-server* to beginning of *cider-repl*."
-      (save-excursion
-        (goto-char (point-min))
-        (insert
-         (with-current-buffer nrepl-server-buffer
-           (buffer-string))))))
+      (when (buffer-live-p nrepl-server-buffer)
+        (save-excursion
+          (goto-char (point-min))
+          (insert
+           (with-current-buffer nrepl-server-buffer
+             (buffer-string)))))))
 
   ;; The CIDER welcome message obscures error messages that the above code is
   ;; supposed to be make visible.

@@ -3,41 +3,6 @@
 (require 'cl-lib)
 (require 'subr-x)
 
-;; Polyfills
-(unless EMACS26+
-  (with-no-warnings
-    ;; `kill-current-buffer' was introduced in Emacs 26
-    (defalias 'kill-current-buffer #'kill-this-buffer)
-    ;; if-let and when-let were moved to (if|when)-let* in Emacs 26+ so we alias
-    ;; them for 25 users.
-    (defalias 'if-let* #'if-let)
-    (defalias 'when-let* #'when-let)
-
-    ;; `mapcan' was introduced in 26.1. `cl-mapcan' isn't a perfect replacement,
-    ;; but it's close enough.
-    (defalias 'mapcan #'cl-mapcan)
-
-    (defun alist-get (key alist &optional default remove testfn)
-      "Return the value associated with KEY in ALIST.
-If KEY is not found in ALIST, return DEFAULT.
-Use TESTFN to lookup in the alist if non-nil.  Otherwise, use `assq'.
-
-This is a generalized variable suitable for use with `setf'.
-When using it to set a value, optional argument REMOVE non-nil
-means to remove KEY from ALIST if the new value is `eql' to DEFAULT."
-      (ignore remove) ;;Silence byte-compiler.
-      (let ((x (if (not testfn)
-                   (assq key alist)
-                 ;; In Emacs<26, `assoc' has no testfn arg, so we have to
-                 ;; implement it ourselves
-                 (if testfn
-                     (cl-loop for entry in alist
-                              if (funcall testfn key entry)
-                              return entry)
-                   (assoc key alist)))))
-        (if x (cdr x) default)))))
-
-
 ;;
 ;;; Helpers
 
@@ -199,6 +164,14 @@ If FETCHER is a function, ELT is used as the key in LIST (an alist)."
                   elt)
                ,list)))
 
+(defmacro add-load-path! (&rest dirs)
+  "Add DIRS to `load-path', relative to the current file.
+The current file is the file from which `add-to-load-path!' is used."
+  `(let ((default-directory ,(dir!))
+         file-name-handler-alist)
+     (dolist (dir (list ,@dirs))
+       (cl-pushnew (expand-file-name dir) load-path))))
+
 (defmacro add-transient-hook! (hook-or-function &rest forms)
   "Attaches a self-removing function to HOOK-OR-FUNCTION.
 
@@ -270,7 +243,7 @@ This macro accepts, in order:
                        (mapcar #'doom-unquote rest)
                      (doom-enlist (doom-unquote (car rest))))))
 
-            ((setq func-forms (list `(lambda () ,@rest)))))
+            ((setq func-forms (list `(lambda (&rest _) ,@rest)))))
       (dolist (hook hook-forms)
         (dolist (func func-forms)
           (push (if remove-p

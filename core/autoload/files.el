@@ -33,7 +33,8 @@ This is used by `file-exists-p!' and `project-file-exists-p!'."
       (let ((filevar (make-symbol "file")))
         `(let* ((file-name-handler-alist nil)
                 (,filevar ,spec))
-           (and ,(if directory
+           (and (stringp ,filevar)
+                ,(if directory
                      `(let ((default-directory ,directory))
                         (,exists-fn ,filevar))
                    (list exists-fn filevar))
@@ -165,6 +166,37 @@ Returns the last file found to meet the rules set by FILES, which can be a
 single file or nested compound statement of `and' and `or' statements."
   `(let ((p ,(doom--resolve-path-forms files directory)))
      (and p (expand-file-name p ,directory))))
+
+;;;###autoload
+(defun doom-file-size (file &optional dir)
+  "Returns the size of FILE (in DIR) in bytes."
+  (let ((file (expand-file-name file dir)))
+    (unless (file-exists-p file)
+      (error "Couldn't find file %S" file))
+    (unless (file-readable-p file)
+      (error "File %S is unreadable; can't acquire its filesize"
+             file))
+    (nth 7 (file-attributes file))))
+
+;;;###autoload
+(defun doom-directory-size (dir)
+  "Returns the size of FILE (in DIR) in kilobytes."
+  (unless (file-directory-p dir)
+    (error "Directory %S does not exist" dir))
+  (if (executable-find "du")
+      (/ (string-to-number (cdr (doom-call-process "du" "-sb" dir)))
+         1024.0)
+    ;; REVIEW This is slow and terribly inaccurate, but it's something
+    (let ((w32-get-true-file-attributes t)
+          (file-name-handler-alist dir)
+          (max-lisp-eval-depth 5000)
+          (sum 0.0))
+      (dolist (attrs (directory-files-and-attributes dir nil nil t) sum)
+        (unless (member (car attrs) '("." ".."))
+          (cl-incf
+           sum (if (eq (nth 1 attrs) t) ; is directory
+                   (doom-directory-size (expand-file-name (car attrs) dir))
+                 (/ (nth 8 attrs) 1024.0))))))))
 
 
 ;;

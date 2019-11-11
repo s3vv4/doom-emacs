@@ -81,7 +81,7 @@
 
 Excludes packages that have a non-nil :built-in property."
   (when-let (plist (doom-package-get package))
-    (not (eval (plist-get plist :ignore) t))))
+    (not (plist-get plist :ignore) t)))
 
 ;;;###autoload
 (defun doom-package-private-p (package)
@@ -139,7 +139,7 @@ was installed with."
           (when (file-readable-p file)
             (insert-file-contents file)
             (delay-mode-hooks (emacs-lisp-mode))
-            (while (re-search-forward "(package! " nil t)
+            (while (search-forward "(package! " nil t)
               (save-excursion
                 (goto-char (match-beginning 0))
                 (unless (let ((ppss (syntax-ppss)))
@@ -176,7 +176,7 @@ ones."
         ;; We load the private packages file twice to ensure disabled packages
         ;; are seen ASAP, and a second time to ensure privately overridden
         ;; packages are properly overwritten.
-        (doom--read-module-packages-file private-packages t t))
+        (doom--read-module-packages-file private-packages nil t))
       (if all-p
           (mapc #'doom--read-module-packages-file
                 (doom-files-in doom-modules-dir

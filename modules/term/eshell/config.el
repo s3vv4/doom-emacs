@@ -132,9 +132,9 @@ You should use `set-eshell-alias!' to change this.")
             :n "C"       #'+eshell/evil-change-line
             :n "d"       #'+eshell/evil-delete
             :n "D"       #'+eshell/evil-delete-line
-            :ig "TAB"     #'+eshell/pcomplete
-            :ig [tab]     #'+eshell/pcomplete
             :ig "C-d"     #'+eshell/quit-or-delete-char
+            "TAB"   #'+eshell/pcomplete
+            [tab]   #'+eshell/pcomplete
             "C-s"   #'+eshell/search-history
             ;; Emacs bindings
             "C-e"   #'end-of-line
@@ -151,15 +151,19 @@ You should use `set-eshell-alias!' to change this.")
             [remap doom/backward-to-bol-or-indent] #'eshell-bol
             [remap doom/backward-kill-to-bol-and-indent] #'eshell-kill-input
             [remap evil-window-split]   #'+eshell/split-below
-            [remap evil-window-vsplit]  #'+eshell/split-right))))
+            [remap evil-window-vsplit]  #'+eshell/split-right)))
+  (add-hook! 'eshell-mode-hook
+    (defun +eshell-init-company-h ()
+      (when (featurep! :completion company)
+        (company-mode +1)
+        (setq-local company-backends '(company-pcomplete))
+        (setq-local company-frontends (cons 'company-tng-frontend company-frontends))
+        (when (bound-and-true-p evil-local-mode)
+          (evil-normalize-keymaps))))))
 
 
 (use-package! eshell-up
   :commands eshell-up eshell-up-peek)
-
-
-(use-package! shrink-path
-  :commands shrink-path-file)
 
 
 (use-package! eshell-z
@@ -169,3 +173,8 @@ You should use `set-eshell-alias!' to change this.")
   (unless (file-exists-p eshell-z-freq-dir-hash-table-file-name)
     (setq eshell-z-freq-dir-hash-table-file-name
           (expand-file-name "z" eshell-directory-name))))
+
+
+(use-package! esh-help
+  :after eshell
+  :config (setup-esh-help-eldoc))

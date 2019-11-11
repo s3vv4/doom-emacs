@@ -62,20 +62,31 @@ possible."
 (add-hook! 'find-file-not-found-functions
   (defun doom-create-missing-directories-h ()
     "Automatically create missing directories when creating new files."
-    (let ((parent-directory (file-name-directory buffer-file-name)))
-      (when (and (not (file-exists-p parent-directory))
-                 (y-or-n-p (format "Directory `%s' does not exist! Create it?" parent-directory)))
-        (make-directory parent-directory t)))))
+    (unless (file-remote-p buffer-file-name)
+      (let ((parent-directory (file-name-directory buffer-file-name)))
+        (and (not (file-directory-p parent-directory))
+             (y-or-n-p (format "Directory `%s' does not exist! Create it?"
+                               parent-directory))
+             (progn (make-directory parent-directory 'parents)
+                    t))))))
 
-;; Don't autosave files or create lock/history/backup files. The
-;; editor doesn't need to hold our hands so much. We'll rely on git
-;; and our own good fortune instead. Fingers crossed!
+;; Don't autosave files or create lock/history/backup files. We don't want
+;; copies of potentially sensitive material floating around, and we'll rely on
+;; git and our own good fortune instead. Fingers crossed!
 (setq auto-save-default nil
       create-lockfiles nil
       make-backup-files nil
       ;; But have a place to store them in case we do use them...
       auto-save-list-file-name (concat doom-cache-dir "autosave")
       backup-directory-alist `(("." . ,(concat doom-cache-dir "backup/"))))
+
+(add-hook! 'after-save-hook
+  (defun doom-guess-mode-h ()
+    "Guess mode when saving a file in `fundamental-mode'."
+    (and (eq major-mode 'fundamental-mode)
+         (buffer-file-name (buffer-base-buffer))
+         (eq (current-buffer) (window-buffer (selected-window))) ; only visible buffers
+         (set-auto-mode))))
 
 
 ;;
@@ -97,13 +108,16 @@ possible."
       require-final-newline t
       tabify-regexp "^\t* [ \t]+")  ; for :retab
 
+;; Favor hard-wrapping in text modes
+(add-hook 'text-mode-hook #'auto-fill-mode)
+
 
 ;;
 ;;; Clipboard / kill-ring
 
- ;; Eliminate duplicates in the kill ring. That is, if you kill the
- ;; same thing twice, you won't have to use M-y twice to get past it
- ;; to older entries in the kill ring.
+;; Eliminate duplicates in the kill ring. That is, if you kill the same thing
+;; twice, you won't have to use M-y twice to get past it to older entries in the
+;; kill ring.
 (setq kill-do-not-save-duplicates t)
 
 ;;
@@ -112,11 +126,20 @@ possible."
 ;; Save clipboard contents into kill-ring before replacing them
 (setq save-interprogram-paste-before-kill t)
 
+;; Fixes the clipboard in tty Emacs by piping clipboard I/O through xclip, xsel,
+;; pb{copy,paste}, wl-copy, termux-clipboard-get, or getclip (cygwin).
+(add-hook! 'tty-setup-hook
+  (defun doom-init-clipboard-in-tty-emacs-h ()
+    (and (not (getenv "SSH_CONNECTION"))
+         (require 'xclip nil t)
+         (xclip-mode +1))))
+
 
 ;;
 ;;; Extra file extensions to support
 
 (push '("/LICENSE\\'" . text-mode) auto-mode-alist)
+(push '("\\.log\\'" . text-mode) auto-mode-alist)
 
 
 ;;
@@ -131,7 +154,9 @@ possible."
   :config
   (setq auto-revert-verbose t ; let us know when it happens
         auto-revert-use-notify nil
-        auto-revert-stop-on-user-input nil)
+        auto-revert-stop-on-user-input nil
+        ;; Only prompts for confirmation when buffer is unsaved.
+        revert-without-query (list "."))
 
   ;; Instead of using `auto-revert-mode' or `global-auto-revert-mode', we employ
   ;; lazy auto reverting on `focus-in-hook' and `doom-switch-buffer-hook'.
@@ -142,16 +167,14 @@ possible."
   ;; changes when we switch to a buffer or when we focus the Emacs frame.
   (defun doom-auto-revert-buffer-h ()
     "Auto revert current buffer, if necessary."
-    (unless auto-revert-mode
-      (let ((revert-without-query t))
-        (auto-revert-handler))))
+    (unless (or auto-revert-mode (active-minibuffer-window))
+      (auto-revert-handler)))
 
   (defun doom-auto-revert-buffers-h ()
-    "Auto revert's stale buffers (that are visible)."
-    (unless auto-revert-mode
-      (dolist (buf (doom-visible-buffers))
-        (with-current-buffer buf
-          (doom-auto-revert-buffer-h))))))
+    "Auto revert stale buffers in visible windows, if necessary."
+    (dolist (buf (doom-visible-buffers))
+      (with-current-buffer buf
+        (doom-auto-revert-buffer-h)))))
 
 
 (use-package! recentf
@@ -160,6 +183,13 @@ possible."
   :after-call after-find-file
   :commands recentf-open-files
   :config
+  (defun doom--recent-file-truename (file)
+    (if (or (file-remote-p file nil t)
+            (not (file-remote-p file)))
+        (file-truename file)
+      file))
+  (setq recentf-filename-handlers '(doom--recent-file-truename abbreviate-file-name))
+
   (setq recentf-save-file (concat doom-cache-dir "recentf")
         recentf-auto-cleanup 'never
         recentf-max-menu-items 0
@@ -168,15 +198,7 @@ possible."
         (list "\\.\\(?:gz\\|gif\\|svg\\|png\\|jpe?g\\)$" "^/tmp/" "^/ssh:"
               "\\.?ido\\.last$" "\\.revive$" "/TAGS$" "^/var/folders/.+$"
               ;; ignore private DOOM temp files
-              (lambda (path)
-                (ignore-errors (file-in-directory-p path doom-local-dir)))))
-
-  (defun doom--recent-file-truename (file)
-    (if (or (file-remote-p file nil t)
-            (not (file-remote-p file)))
-        (file-truename file)
-      file))
-  (setq recentf-filename-handlers '(doom--recent-file-truename abbreviate-file-name))
+              (concat "^" (recentf-apply-filename-handlers doom-local-dir))))
 
   (add-hook! '(doom-switch-window-hook write-file-functions)
     (defun doom--recentf-touch-buffer-h ()
@@ -298,7 +320,10 @@ files, so we replace calls to `pp' with the much faster `prin1'."
   ;; Creates a jump point before killing a buffer. This allows you to undo
   ;; killing a buffer easily (only works with file buffers though; it's not
   ;; possible to resurrect special buffers).
-  (advice-add #'kill-current-buffer :around #'doom-set-jump-a))
+  (advice-add #'kill-current-buffer :around #'doom-set-jump-a)
+
+  ;; Create a jump point before jumping with imenu.
+  (advice-add #'imenu :around #'doom-set-jump-a))
 
 
 (use-package! dtrt-indent
@@ -445,11 +470,22 @@ files, so we replace calls to `pp' with the much faster `prin1'."
 (use-package! so-long
   :after-call after-find-file
   :config
-  (global-so-long-mode +1)
+  (when doom-interactive-mode
+    (global-so-long-mode +1))
+  ;; Don't disable syntax highlighting and line numbers, or make the buffer
+  ;; read-only, in `so-long-minor-mode', so we can have a basic editing
+  ;; experience in them, at least. It will remain off in `so-long-mode',
+  ;; however, because long files have a far bigger impact on Emacs performance.
   (delq! 'font-lock-mode so-long-minor-modes)
   (delq! 'display-line-numbers-mode so-long-minor-modes)
+  (delq! 'buffer-read-only so-long-variable-overrides 'assq)
+  ;; ...but at least reduce the level of syntax highlighting
+  (add-to-list 'so-long-variable-overrides '(font-lock-maximum-decoration . 1))
+  ;; But disable everything else that may be unnecessary/expensive for large
+  ;; or wide buffers.
   (appendq! so-long-minor-modes
             '(flycheck-mode
+              flyspell-mode
               eldoc-mode
               smartparens-mode
               highlight-numbers-mode

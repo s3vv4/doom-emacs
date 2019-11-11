@@ -8,10 +8,10 @@
   emacs -Q -l init.el -f doom-run-all-startup-hooks-h"
   (run-hook-wrapped 'after-init-hook #'doom-try-run-hook)
   (setq after-init-time (current-time))
-  (dolist (hook (list 'delayed-warnings-hook
-                      'emacs-startup-hook 'term-setup-hook
-                      'window-setup-hook))
-    (run-hook-wrapped hook #'doom-try-run-hook)))
+  (mapc (doom-rpartial #'run-hook-wrapped #'doom-try-run-hook)
+        (list 'delayed-warnings-hook
+              'emacs-startup-hook 'tty-setup-hook
+              'window-setup-hook)))
 
 
 ;;
@@ -32,9 +32,8 @@ ready to be pasted in a bug report on github."
         (doom-modules (doom-modules)))
     (cl-letf
         (((symbol-function 'sh)
-          (lambda (format)
-            (string-trim
-             (shell-command-to-string format)))))
+          (lambda (&rest args)
+            (cdr (apply #'doom-call-process args)))))
       `((emacs
          (version . ,emacs-version)
          (features ,@system-configuration-features)
@@ -47,14 +46,14 @@ ready to be pasted in a bug report on github."
                             'server-running))))
         (doom
          (version . ,doom-version)
-         (build . ,(sh "git log -1 --format=\"%D %h %ci\"")))
+         (build . ,(sh "git" "log" "-1" "--format=%D %h %ci")))
         (system
          (type . ,system-type)
          (config . ,system-configuration)
          (shell . ,shell-file-name)
          (uname . ,(if IS-WINDOWS
                        "n/a"
-                     (sh "uname -msrv")))
+                     (sh "uname" "-msrv")))
          (path . ,(mapcar #'abbreviate-file-name exec-path)))
         (config
          (envfile
@@ -117,7 +116,7 @@ branch and commit."
                 "n/a")
             (or (vc-git-working-revision doom-core-dir)
                 "n/a")
-            (or (string-trim (shell-command-to-string "git log -1 --format=%ci"))
+            (or (cdr (doom-call-process "git" "log" "-1" "--format=%ci"))
                 "n/a"))))
 
 ;;;###autoload
@@ -137,7 +136,7 @@ markdown and copies it to your clipboard, ready to be pasted into bug reports!"
           (progn
             (save-excursion
               (pp info (current-buffer)))
-            (when (re-search-forward "(modules " nil t)
+            (when (search-forward "(modules " nil t)
               (goto-char (match-beginning 0))
               (cl-destructuring-bind (beg . end)
                   (bounds-of-thing-at-point 'sexp)
@@ -392,5 +391,7 @@ will be automatically appended to the result."
          (cond ((eq arg 'toggle) (not doom-debug-mode))
                ((> (prefix-numeric-value arg) 0)))))
     (setq doom-debug-mode value
-          debug-on-error value)
+          debug-on-error value
+          jka-compr-verbose value
+          lsp-log-io value)
     (message "Debug mode %s" (if value "on" "off"))))

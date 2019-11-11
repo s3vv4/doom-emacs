@@ -179,38 +179,38 @@ If ARG (universal argument), open selection in other-window."
              .type .file .line)))))
 
 (defun +ivy--tasks (target)
-  (let* (case-fold-search
-         (task-tags (mapcar #'car +ivy-task-tags))
-         (cmd
-          (format "%s -H -S --no-heading -- %s %s"
-                  (or (when-let (bin (executable-find "rg"))
-                        (concat bin " --line-number"))
-                      (when-let (bin (executable-find "ag"))
-                        (concat bin " --numbers"))
-                      (error "ripgrep & the_silver_searcher are unavailable"))
-                  (shell-quote-argument
-                   (concat "\\s("
-                           (string-join task-tags "|")
-                           ")([\\s:]|\\([^)]+\\):?)"))
-                  target)))
-    (save-match-data
-      (cl-loop with out = (shell-command-to-string cmd)
-               for x in (and out (split-string out "\n" t))
-               when (condition-case-unless-debug ex
+  (let (case-fold-search)
+    (cl-loop with task-tags = (mapcar #'car +ivy-task-tags)
+             with out =
+             (cdr
+              (apply #'doom-call-process
+                     (append
+                      (or (when-let (bin (executable-find "rg"))
+                            (list bin "--line-number"))
+                          (when-let (bin (executable-find "ag"))
+                            (list bin "--numbers"))
+                          (user-error "ripgrep & the_silver_searcher are unavailable"))
+                      (list "-H" "-S" "--no-heading" "--"
+                            (concat "\\s("
+                                    (string-join task-tags "|")
+                                    ")([\\s:]|\\([^)]+\\):?)")
+                            target))))
+             for x in (and out (split-string out "\n" t))
+             when (condition-case-unless-debug ex
                       (string-match
                        (concat "^\\([^:]+\\):\\([0-9]+\\):.+\\("
                                (string-join task-tags "\\|")
                                "\\):?\\s-*\\(.+\\)")
                        x)
-                      (error
-                       (print! (red "Error matching task in file: (%s) %s")
-                               (error-message-string ex)
-                               (car (split-string x ":")))
-                       nil))
-               collect `((type . ,(match-string 3 x))
-                         (desc . ,(match-string 4 x))
-                         (file . ,(match-string 1 x))
-                         (line . ,(match-string 2 x)))))))
+                    (error
+                     (print! (red "Error matching task in file: (%s) %s")
+                             (error-message-string ex)
+                             (car (split-string x ":")))
+                     nil))
+             collect `((type . ,(match-string 3 x))
+                       (desc . ,(match-string 4 x))
+                       (file . ,(match-string 1 x))
+                       (line . ,(match-string 2 x))))))
 
 (defun +ivy--tasks-open-action (x)
   "Jump to the file and line of the current task."
@@ -366,14 +366,14 @@ order.
                     (let ((query (buffer-substring-no-properties beg end)))
                       ;; Escape characters that are special to ivy searches
                       (replace-regexp-in-string "[! |]" (lambda (substr)
-                                                          (cond ((and (featurep! +fuzzy)
-                                                                      (string= substr " "))
+                                                          (cond ((and (string= substr " ")
+                                                                      (not (featurep! +fuzzy)))
                                                                  "  ")
                                                                 ((and (string= substr "|")
                                                                       (eq engine 'rg))
                                                                  "\\\\\\\\|")
                                                                 ((concat "\\\\" substr))))
-                                                (regexp-quote query))))))))
+                                                (rxt-quote-pcre query))))))))
          (prompt
           (format "%s%%s %s"
                   (symbol-name engine)
@@ -406,13 +406,6 @@ order.
          (let ((args (concat (if all-files " -uu")
                              (unless recursive " --maxdepth 1"))))
            (counsel-rg query directory args (format prompt args))))
-        (`pt
-         (let ((counsel-pt-base-command
-                (concat counsel-pt-base-command
-                        (if all-files " -U")
-                        (unless recursive " --depth=1")))
-               (default-directory directory))
-           (counsel-pt query)))
         (_ (error "No search engine specified"))))))
 
 (defun +ivy--get-command (format)
@@ -451,8 +444,6 @@ ARG (universal argument), include all files, even hidden or compressed ones."
 ;;;###autoload (autoload '+ivy/rg-from-cwd "completion/ivy/autoload/ivy" nil t)
 ;;;###autoload (autoload '+ivy/ag "completion/ivy/autoload/ivy" nil t)
 ;;;###autoload (autoload '+ivy/ag-from-cwd "completion/ivy/autoload/ivy" nil t)
-;;;###autoload (autoload '+ivy/pt "completion/ivy/autoload/ivy" nil t)
-;;;###autoload (autoload '+ivy/pt-from-cwd "completion/ivy/autoload/ivy" nil t)
 ;;;###autoload (autoload '+ivy/grep "completion/ivy/autoload/ivy" nil t)
 ;;;###autoload (autoload '+ivy/grep-from-cwd "completion/ivy/autoload/ivy" nil t)
 
@@ -480,3 +471,68 @@ active, the last known search is used.
 
 If ALL-FILES-P, search compressed and hidden files as well."
             engine)))
+
+
+;;
+;;; Wrappers around `counsel-compile'
+
+;;;###autoload
+(defun +ivy/compile ()
+  "Execute a compile command from the current buffer's directory."
+  (interactive)
+  (counsel-compile default-directory))
+
+;;;###autoload
+(defun +ivy/project-compile ()
+  "Execute a compile command from the current project's root."
+  (interactive)
+  (counsel-compile (projectile-project-root)))
+
+;;;###autoload
+(defun +ivy/jump-list ()
+  "Go to an entry in evil's (or better-jumper's) jumplist."
+  (interactive)
+  ;; REVIEW Refactor me
+  (let (buffers)
+    (unwind-protect
+        (ivy-read "jumplist: "
+                  (nreverse
+                   (delete-dups
+                    (delq
+                     nil
+                     (mapcar (lambda (mark)
+                               (when mark
+                                 (cl-destructuring-bind (path pt _id) mark
+                                   (let ((buf (get-file-buffer path)))
+                                     (unless buf
+                                       (push (setq buf (find-file-noselect path t))
+                                             buffers))
+                                     (with-current-buffer buf
+                                       (goto-char pt)
+                                       (font-lock-fontify-region (line-beginning-position) (line-end-position))
+                                       (cons (format "%s:%d: %s"
+                                                     (buffer-name)
+                                                     (line-number-at-pos)
+                                                     (string-trim-right (thing-at-point 'line)))
+                                             (point-marker)))))))
+                             (cddr (better-jumper-jump-list-struct-ring
+                                    (better-jumper-get-jumps (better-jumper--get-current-context))))))))
+                  :sort nil
+                  :require-match t
+                  :action (lambda (cand)
+                            (let ((mark (cdr cand)))
+                              (delq! (marker-buffer mark) buffers)
+                              (mapc #'kill-buffer buffers)
+                              (setq buffers nil)
+                              (with-current-buffer (switch-to-buffer (marker-buffer mark))
+                                (goto-char (marker-position mark)))))
+                  :caller '+ivy/jump-list)
+      (mapc #'kill-buffer buffers))))
+
+;;;###autoload
+(defun +ivy/git-grep-other-window-action ()
+  "Open the current counsel-{ag,rg,git-grep} candidate in other-window."
+  (interactive)
+  (ivy-set-action #'+ivy-git-grep-other-window-action)
+  (setq ivy-exit 'done)
+  (exit-minibuffer))

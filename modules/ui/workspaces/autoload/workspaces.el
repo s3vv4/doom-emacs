@@ -263,7 +263,7 @@ workspace to delete."
                  (+workspace-switch +workspaces-main t)
                  (unless (string= (car workspaces) +workspaces-main)
                    (+workspace-delete name))
-                 (doom/kill-all-buffers)))
+                 (doom/kill-all-buffers (doom-buffer-list))))
           (+workspace-message (format "Deleted '%s' workspace" name) 'success)))
     ('error (+workspace-error ex t))))
 
@@ -274,7 +274,7 @@ workspace to delete."
   (unless (cl-every #'+workspace-delete (+workspace-list-names))
     (+workspace-error "Could not clear session"))
   (+workspace-switch +workspaces-main t)
-  (doom/kill-all-buffers))
+  (doom/kill-all-buffers (buffer-list)))
 
 ;;;###autoload
 (defun +workspace/kill-session-and-quit ()
@@ -510,6 +510,8 @@ This be hooked to `projectile-after-switch-project-hook'."
           (with-current-buffer (doom-fallback-buffer)
             (setq default-directory +workspaces--project-dir)
             (message "Switched to '%s'" (doom-project-name +workspaces--project-dir)))
+          (with-demoted-errors "Workspace error: %s"
+            (+workspace-rename (+workspace-current-name) (doom-project-name +workspaces--project-dir)))
           (unless current-prefix-arg
             (funcall +workspaces-switch-project-function +workspaces--project-dir)))
       (setq +workspaces--project-dir nil))))

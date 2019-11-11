@@ -7,32 +7,21 @@
 (defun +emacs-lisp-eval (beg end)
   "Evaluate a region and print it to the echo area (if one line long), otherwise
 to a pop up buffer."
-  (require 'pp)
-  (let ((result
-         (let ((debug-on-error t)
-               (doom--current-module (ignore-errors (doom-module-from-path buffer-file-name))))
-           (eval (read
-                  (concat "(progn "
-                          (buffer-substring-no-properties beg end)
-                          "\n)"))
-                 t)))
-        (buf (get-buffer-create "*doom eval*"))
-        (inhibit-read-only t))
-    (with-current-buffer buf
-      (read-only-mode +1)
-      (erase-buffer)
-      (setq-local scroll-margin 0)
-      (let (emacs-lisp-mode-hook)
-        (emacs-lisp-mode))
-      (pp result buf)
-      (let ((lines (count-lines (point-min) (point-max))))
-        (if (> lines 1)
-            (save-selected-window
-              (pop-to-buffer buf)
-              (with-current-buffer buf
-                (goto-char (point-min))))
-          (message "%s" (buffer-substring (point-min) (point-max)))
-          (kill-buffer buf))))))
+  (+eval-display-results
+   (let* ((buffer-file-name (buffer-file-name (buffer-base-buffer))))
+     (string-trim-right
+      (condition-case-unless-debug e
+          (let ((result
+                 (let ((debug-on-error t))
+                   (eval (read (buffer-substring-no-properties beg end))
+                         `((buffer-file-name . ,buffer-file-name)
+                           (doom--current-module
+                            . ,(ignore-errors
+                                 (doom-module-from-path buffer-file-name))))))))
+            (require 'pp)
+            (replace-regexp-in-string "\\\\n" "\n" (pp-to-string result)))
+        (error (error-message-string e)))))
+   (current-buffer)))
 
 (defvar +emacs-lisp--face nil)
 ;;;###autoload

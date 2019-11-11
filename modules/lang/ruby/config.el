@@ -1,5 +1,9 @@
 ;;; lang/ruby/config.el -*- lexical-binding: t; -*-
 
+(after! projectile
+  (add-to-list 'projectile-project-root-files "Gemfile"))
+
+
 ;;
 ;;; Packages
 
@@ -26,6 +30,10 @@
     (add-to-list 'company-dabbrev-code-modes 'enh-ruby-mode nil #'eq)
     (add-to-list 'company-dabbrev-code-modes 'ruby-mode nil #'eq))
 
+  (after! inf-ruby
+    ;; switch to inf-ruby from compile if we detect a breakpoint has been hit
+    (add-hook 'compilation-filter-hook 'inf-ruby-auto-enter))
+
   ;; so class and module pairs work
   (setq-hook! (ruby-mode enh-ruby-mode) sp-max-pair-length 6))
 
@@ -36,7 +44,8 @@
   (add-hook! 'enh-ruby-mode-hook
     (defun +ruby-init-robe-mode-maybe-h ()
       "Start `robe-mode' if `lsp-mode' isn't active."
-      (unless (bound-and-true-p lsp-mode)
+      (unless (or (bound-and-true-p lsp-mode)
+                  (bound-and-true-p lsp--buffer-deferred))
         (robe-mode +1))))
   :config
   (set-repl-handler! 'enh-ruby-mode #'robe-start)

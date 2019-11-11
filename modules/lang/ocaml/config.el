@@ -25,6 +25,9 @@
   (setq-hook! 'tuareg-mode-hook
     comment-line-break-function #'+ocaml/comment-indent-new-line)
 
+  (map! :localleader
+        :map tuareg-mode-map
+        "a" #'tuareg-find-alternate-file)
 
   (use-package! utop
     :when (featurep! :tools eval)
@@ -57,20 +60,18 @@
 
   (map! :localleader
         :map tuareg-mode-map
-        "t" #'merlin-type-enclosing
-        "a" #'tuareg-find-alternate-file)
+        "t" #'merlin-type-enclosing)
 
   (use-package! flycheck-ocaml
     :when (featurep! :tools flycheck)
     :hook (merlin-mode . +ocaml-init-flycheck-h)
     :config
     (defun +ocaml-init-flycheck-h ()
-      "Activate `flycheck-ocaml` if the current project possesses a .merlin file."
-      (when (projectile-locate-dominating-file default-directory ".merlin")
-        ;; Disable Merlin's own error checking
-        (setq merlin-error-after-save nil)
-        ;; Enable Flycheck checker
-        (flycheck-ocaml-setup))))
+      "Activate `flycheck-ocaml`"
+      ;; Disable Merlin's own error checking
+      (setq merlin-error-after-save nil)
+      ;; Enable Flycheck checker
+      (flycheck-ocaml-setup)))
 
   (use-package! merlin-eldoc
     :hook (merlin-mode . merlin-eldoc-setup))

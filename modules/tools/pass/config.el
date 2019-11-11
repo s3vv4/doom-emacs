@@ -10,7 +10,7 @@
 ;;
 ;; Packages
 
-;; `password-store'
+;;;###package password-store
 (setq password-store-password-length 12)
 
 ;; Fix hard-coded password-store location; respect PASSWORD_STORE_DIR envvar
@@ -36,5 +36,5 @@
 
 
 ;; Is built into Emacs 26+
-(when (and EMACS26+ (featurep! +auth))
+(when (featurep! +auth)
   (auth-source-pass-enable))

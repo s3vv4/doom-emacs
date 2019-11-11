@@ -1,6 +1,6 @@
 ;;; completion/helm/config.el -*- lexical-binding: t; -*-
 
-(defvar +helm-project-search-engines '(rg ag pt)
+(defvar +helm-project-search-engines '(rg ag)
   "What search tools for `+helm/project-search' (and `+helm-file-search' when no
 ENGINE is specified) to try, and in what order.
 
@@ -82,7 +82,7 @@ be negative.")
     (setq helm-default-prompt-display-function #'+helm--set-prompt-display))
 
   :init
-  (when (and EMACS26+ (featurep! +childframe))
+  (when (featurep! +childframe)
     (setq helm-display-function #'+helm-posframe-display-fn))
 
   (let ((fuzzy (featurep! +fuzzy)))

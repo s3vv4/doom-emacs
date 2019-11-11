@@ -213,13 +213,13 @@
           :desc "Add cursor w/mouse" "<mouse-1>" #'mc/add-cursor-on-click))
 
       ;; APPs
-      ;;; <leader> M --- twitter
+      ;;; <leader> M --- mu4e
       (:when (featurep! :email mu4e)
         (:prefix-map ("M" . "mu4e")
           :desc "Open email app" "M" #'=mu4e
           :desc "Compose email"  "c" #'+mu4e/compose))
 
-      ;;; <leader> I --- twitter
+      ;;; <leader> I --- IRC
       (:when (featurep! :app irc)
         (:prefix-map ("I" . "irc")
           :desc "Open irc app"       "I" #'=irc
@@ -337,36 +337,36 @@
       (:when (featurep! :completion ivy)
         (:after ivy
           :map ivy-minibuffer-map
-          "TAB" #'ivy-alt-done
-          "C-g" #'keyboard-escape-quit)
+          "TAB"   #'ivy-alt-done
+          "C-g"   #'keyboard-escape-quit)
         (:after counsel
           :map counsel-ag-map
-          "C-SPC"    #'ivy-call-and-recenter ; preview
-          "M-RET"    (+ivy-do-action! #'+ivy-git-grep-other-window-action))
-        "C-M-y" #'counsel-yank-pop)
+          "C-SPC" #'ivy-call-and-recenter ; preview
+          "M-RET" #'+ivy/git-grep-other-window-action)
+        "C-M-y"   #'counsel-yank-pop)
 
       ;;; neotree
       (:when (featurep! :ui neotree)
-        "<f9>"   #'+neotree/open
-        "<C-f9>" #'+neotree/find-this-file
+        "<f9>"    #'+neotree/open
+        "<C-f9>"  #'+neotree/find-this-file
         (:after neotree
           :map neotree-mode-map
-          "q"       #'neotree-hide
-          "RET"     #'neotree-enter
-          "SPC"     #'neotree-quick-look
-          "v"       #'neotree-enter-vertical-split
-          "s"       #'neotree-enter-horizontal-split
-          "c"       #'neotree-create-node
-          "D"       #'neotree-delete-node
-          "g"       #'neotree-refresh
-          "r"       #'neotree-rename-node
-          "R"       #'neotree-refresh
-          "h"       #'+neotree/collapse-or-up
-          "l"       #'+neotree/expand-or-open
-          "n"       #'neotree-next-line
-          "p"       #'neotree-previous-line
-          "N"       #'neotree-select-next-sibling-node
-          "P"       #'neotree-select-previous-sibling-node))
+          "q"     #'neotree-hide
+          "RET"   #'neotree-enter
+          "SPC"   #'neotree-quick-look
+          "v"     #'neotree-enter-vertical-split
+          "s"     #'neotree-enter-horizontal-split
+          "c"     #'neotree-create-node
+          "D"     #'neotree-delete-node
+          "g"     #'neotree-refresh
+          "r"     #'neotree-rename-node
+          "R"     #'neotree-refresh
+          "h"     #'+neotree/collapse-or-up
+          "l"     #'+neotree/expand-or-open
+          "n"     #'neotree-next-line
+          "p"     #'neotree-previous-line
+          "N"     #'neotree-select-next-sibling-node
+          "P"     #'neotree-select-previous-sibling-node))
 
       ;;; popups
       (:when (featurep! :ui popup)

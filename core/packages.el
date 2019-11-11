@@ -9,12 +9,6 @@
 (package! all-the-icons)
 (package! hide-mode-line)
 (package! highlight-numbers)
-;; Some early 26.x builds of Emacs do not have `display-line-numbers' yet, so
-;; check for it instead of Emacs' version.
-(unless (locate-library "display-line-numbers")
-  (package! nlinum)
-  (package! nlinum-hl)
-  (package! nlinum-relative))
 (package! rainbow-delimiters)
 (package! restart-emacs)
 
@@ -36,6 +30,7 @@
   ;; from emacsmirror/undo-tree instead.
   :recipe (:host github :repo "emacsmirror/undo-tree"))
 (package! ws-butler)
+(package! xclip)
 
 ;; core-projects.el
 (package! projectile)
