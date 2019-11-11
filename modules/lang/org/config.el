@@ -712,6 +712,112 @@ between the two."
         "t" #'org-agenda-todo))
 
 
+(defun +org-init-keybinds-for-evil-h (&rest args)
+  "TODO"
+  (when (featurep! :editor evil +everywhere)
+    (use-package! evil-org
+      :hook (org-mode . evil-org-mode)
+      :init
+      (defvar evil-org-key-theme '(navigation insert textobjects))
+      (defvar evil-org-retain-visual-state-on-shift t)
+      (defvar evil-org-special-o/O '(table-row))
+      (add-hook 'evil-org-mode-hook #'evil-normalize-keymaps)
+      :config
+      ;; change `evil-org-key-theme' instead
+      (advice-add #'evil-org-set-key-theme :override #'ignore))
+
+    (use-package! evil-org-agenda
+      :after org-agenda
+      :config (evil-org-agenda-set-keys))
+
+    ;; Fix o/O creating new list items in the middle of nested plain lists. Only
+    ;; has an effect when `evil-org-special-o/O' has `item' in it (not the
+    ;; default).
+    (advice-add #'evil-org-open-below :around #'+org-evil-org-open-below-a)
+
+    (map! :map outline-mode-map
+          ;; Undo keybinds from `evil-collection-outline'
+          :n "^" nil
+          :n [backtab] nil
+          :n "M-j" nil
+          :n "M-k" nil
+          :n "C-j" nil
+          :n "C-k" nil
+          :n "]" nil
+          :n "[" nil
+
+          :map evil-org-mode-map
+          :ni [C-return]   #'+org/insert-item-below
+          :ni [C-S-return] #'+org/insert-item-above
+          ;; navigate table cells (from insert-mode)
+          :i "C-l" (general-predicate-dispatch 'org-end-of-line
+                     (org-at-table-p) 'org-table-next-field)
+          :i "C-h" (general-predicate-dispatch 'org-beginning-of-line
+                     (org-at-table-p) 'org-table-previous-field)
+          :i "C-k" (general-predicate-dispatch 'org-up-element
+                     (org-at-table-p) '+org/table-previous-row)
+          :i "C-j" (general-predicate-dispatch 'org-down-element
+                     (org-at-table-p) 'org-table-next-row)
+          ;; moving/(de|pro)moting subtress & expanding tables (prepend/append columns/rows)
+          :ni "C-S-l" (general-predicate-dispatch 'org-shiftmetaright
+                        (org-at-table-p) 'org-table-insert-column)
+          :ni "C-S-h" (general-predicate-dispatch 'org-shiftmetaleft
+                        (org-at-table-p) '+org/table-insert-column-left)
+          :ni "C-S-k" (general-predicate-dispatch 'org-shiftmetaup
+                        (org-at-table-p) 'org-table-insert-row)
+          :ni "C-S-j" (general-predicate-dispatch 'org-shiftmetadown
+                        (org-at-table-p) '+org/table-insert-row-below)
+          ;; moving/(de|pro)moting single headings & shifting table rows/columns
+          :ni "C-M-S-l" (general-predicate-dispatch 'org-metaright
+                          (org-at-table-p) 'org-table-move-column-right)
+          :ni "C-M-S-h" (general-predicate-dispatch 'org-metaleft
+                          (org-at-table-p) 'org-table-move-column-left)
+          :ni "C-M-S-k" (general-predicate-dispatch 'org-metaup
+                          (org-at-table-p) 'org-table-move-row-up)
+          :ni "C-M-S-j" (general-predicate-dispatch 'org-metadown
+                          (org-at-table-p) 'org-table-move-row-down)
+          ;; more intuitive RET keybinds
+          :i [return] #'org-return-indent
+          :i "RET"    #'org-return-indent
+          :n [return] #'+org/dwim-at-point
+          :n "RET"    #'+org/dwim-at-point
+          ;; more vim-esque org motion keys (not covered by evil-org-mode)
+          :m "]]"  (λ! (org-forward-heading-same-level nil) (org-beginning-of-line))
+          :m "[["  (λ! (org-backward-heading-same-level nil) (org-beginning-of-line))
+          :m "]h"  #'org-next-visible-heading
+          :m "[h"  #'org-previous-visible-heading
+          :m "]l"  #'org-next-link
+          :m "[l"  #'org-previous-link
+          :m "]c"  #'org-babel-next-src-block
+          :m "[c"  #'org-babel-previous-src-block
+          :m "^"   #'evil-org-beginning-of-line
+          :m "0"   (λ! (let (visual-line-mode) (org-beginning-of-line)))
+          :n "gQ"  #'org-fill-paragraph
+          ;; sensible vim-esque folding keybinds
+          :n "za"  #'+org/toggle-fold
+          :n "zA"  #'org-shifttab
+          :n "zc"  #'+org/close-fold
+          :n "zC"  #'outline-hide-subtree
+          :n "zm"  #'+org/hide-next-fold-level
+          :n "zn"  #'org-narrow-to-subtree
+          :n "zN"  #'org-tree-to-indirect-buffer
+          :n "zo"  #'+org/open-fold
+          :n "zO"  #'outline-show-subtree
+          :n "zr"  #'+org/show-next-fold-level
+          :n "zR"  #'outline-show-all
+          :n "zi"  #'org-toggle-inline-images
+
+          :map org-read-date-minibuffer-local-map
+          "C-h"   (λ! (org-eval-in-calendar '(calendar-backward-day 1)))
+          "C-l"   (λ! (org-eval-in-calendar '(calendar-forward-day 1)))
+          "C-k"   (λ! (org-eval-in-calendar '(calendar-backward-week 1)))
+          "C-j"   (λ! (org-eval-in-calendar '(calendar-forward-week 1)))
+          "C-S-h" (λ! (org-eval-in-calendar '(calendar-backward-month 1)))
+          "C-S-l" (λ! (org-eval-in-calendar '(calendar-forward-month 1)))
+          "C-S-k" (λ! (org-eval-in-calendar '(calendar-backward-year 1)))
+          "C-S-j" (λ! (org-eval-in-calendar '(calendar-forward-year 1))))))
+
+
 (defun +org-init-popup-rules-h ()
   (set-popup-rules!
     '(("^\\*Org Links" :slot -1 :vslot -1 :size 2 :ttl 0)
