@@ -848,7 +848,7 @@ compelling reason, so..."
   (add-hook! 'org-mode-hook
              #'org-bullets-mode  ; "prettier" bullets
              #'toc-org-enable    ; auto-table of contents
-             #'auto-fill-mode    ; hard line wrapping
+             ;;(lambda () (auto-fill-mode  -1))   ; hard line wrapping
              ;; `show-paren-mode' causes flickering with indentation margins made by
              ;; `org-indent-mode', so we turn off show-paren-mode altogether
              #'doom-disable-show-paren-mode-h
@@ -878,6 +878,9 @@ compelling reason, so..."
              #'+org-init-protocol-h
              #'+org-init-protocol-lazy-loader-h
              #'+org-init-smartparens-h)
+
+;;(remove-hook 'org-mode-hook #'auto-fill-mode)
+(add-hook 'text-mode-hook (lambda () (auto-fill-mode -1)))
 
   ;; In case the user has eagerly loaded org from their configs
   (when (and (featurep 'org)
